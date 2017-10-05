@@ -1,1 +1,1 @@
-NP_NN:  is the an customizable ANN written in numpy where you can configure number of hidden layers, number of node as you wish. A good demenstration of how foward and back propagation work.
+NP_NN:  is the an customizable ANN written in python numpy where you can configure number of hidden layers, number of node as you wish. This little program is a simple demonstration of how forward and back propagation work.
