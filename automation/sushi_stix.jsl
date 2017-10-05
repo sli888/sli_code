@@ -1,0 +1,238 @@
+dt = current data table ();
+
+for each row ( if (patmatch(:line item date, "MDT" ), :line item date= substitute (:line item date, "MDT", "")));
+
+dt:line item date << data type (numeric)<< set modeling type (continuous)<< format ("d/m/y h:m:s",23);
+
+dt << new column ("Date", formula (abbrev date (:Line Item Date)));
+dt << new column ("WW", formula (week of year (:Line Item Date)));
+dt << new column ("Day", formula (day of week (:Line Item Date)-1));
+dt << new column ("TimeOfDay", formula (Time Of Day( :Line Item Date ) / 3600));
+
+cat_dt = open ("C:\Users\lishuyi\Documents\personal\sushi_stix_report\cat_merge.jmp");
+
+dt << update (with (cat_dt), match columns (:item name= :item name));
+close (cat_dt, save(0));
+
+dt_sum = dt<< summary (
+ output table name ("summary by date"), group (:Date, :WW, :Day, :Item name,:Category, :Responsibility), sum (:Item revenue),Link to original data table( 0 )	
+);
+
+dt_sum_total = dt<< summary (
+ output table name ("summary by date total"), group (:Date, :WW, :Day), sum (:Item revenue)	
+);
+
+dt_sum_total:name ("sum(Item Revenue)")<<set name ("Total Rev");
+
+dt_sum << update (with (dt_sum_total), match columns (:date= :date));
+
+dt_sum:name ("sum(Item Revenue)")<<set name ("Item Rev");
+dt_sum:date << data type (numeric)<< set modeling type (continuous)<< format ("yyyymmdd",12);
+dt_sum<< sort (replace table, by (:date), order (ascending));
+dt_sum:date << data type (character);
+
+n_row = n rows (dt_sum);
+file_prefix = dt_sum:date[1]||"_"||dt_sum:date [n_row];
+show(file_prefix);
+//dt_sum:date << data type (numeric)<< set modeling type (continuous)<< format ("yyyymmdd",12);
+
+
+item_rank = dt<< summary (
+ output table name ("Sumary by Item"), group (:Item name), sum (:Item revenue),Link to original data table( 0 )	
+);
+
+item_rank:name ("sum(Item Revenue)")<<set name ("Rev");
+
+
+item_rank << Sort(
+	Replace table,
+	By( :Rev),
+	Order( descending)
+);
+
+item_rank << new column ("NewItemName");
+i = 1;
+for each row (
+		prefix = char(i);
+		if (i<10, prefix= "0"||prefix);
+		item_rank:Newitemname= prefix||"_"||item_rank:Item name;
+	i++;
+);
+
+
+
+
+
+
+dt_sum << update (with (item_rank), match columns (:item name= :item name));
+
+by_week = dt_sum<< summary (
+ output table name ("sum_by_week"), group (:ww, :NewItemName), sum (:Item Rev),Link to original data table( 0 )	
+) << Show Window( 0 );
+by_cat = dt_sum<< summary (
+ output table name ("sum_by_cat"), group (:Category, :date), sum (:Item Rev),Link to original data table( 0 )	
+)<< Show Window( 0 );
+by_res = dt_sum<< summary (
+ output table name ("sum_by_res"), group (:responsibility, :date), sum (:Item Rev),Link to original data table( 0 )	
+)<< Show Window( 0 );
+by_cat_ww = dt_sum<< summary (
+ output table name ("sum_by_cat_ww"), group (:Category, :ww), sum (:Item Rev),Link to original data table( 0 )	
+)<< Show Window( 0 );
+by_res_ww = dt_sum<< summary (
+ output table name ("sum_by_res_ww"), group (:responsibility, :ww), sum (:Item Rev),Link to original data table( 0 )	
+)<< Show Window( 0 );
+
+
+final_report = New Window ("sushi_stix_report",
+V list Box(
+
+/*
+	item_rank<<Graph Builder(
+	Size( 1200, 600 ),
+	Show Control Panel( 0 ),
+	Variables( X( :NewItemName ), Y( :Rev ) ),
+	Elements( Bar( X, Y, Legend( 4 ) ) )
+    );
+*/
+
+dt_sum<< Graph Builder(
+	Size( 1200, 900 ),
+	Show Control Panel( 0 ),
+	Variables( X( :Date ), Y( :Item Rev ), Overlay( :NewItemName ) ),
+	Elements( Bar( X, Y, Legend( 10 ), Bar Style( "Stacked" ), Label( "Label by Value" )  ) ),
+	SendToReport(
+		Dispatch( {}, "400", LegendBox, {Set Title( "" ), Set Wrap( 0 )} )
+	)
+);
+
+by_cat<< Graph Builder(
+	Size( 1200, 900 ),
+	Show Control Panel( 0 ),
+	Variables( X( :Date ), Y( name ("sum(Item Rev)") ), Overlay( :category ) ),
+	Elements( Bar( X, Y, Legend( 10 ), Bar Style( "Stacked" ), Label( "Label by Value" )  ) ),
+	SendToReport(
+		Dispatch( {}, "400", LegendBox, {Set Title( "" ), Set Wrap( 0 )} )
+	)
+);
+
+by_res<< Graph Builder(
+	Size( 1200, 900 ),
+	Show Control Panel( 0 ),
+	Variables( X( :Date ), Y( name ("sum(Item Rev)") ), Overlay( :responsibility ) ),
+	Elements( Bar( X, Y, Legend( 10 ), Bar Style( "Stacked" ), Label( "Label by Value" )  ) ),
+	SendToReport(
+		Dispatch( {}, "400", LegendBox, {Set Title( "" ), Set Wrap( 0 )} )
+	)
+);
+by_week<<Graph Builder(
+	Size( 1200, 900 ),
+	Show Control Panel( 0 ),
+	Variables( X( :WW ), Y( name ("sum(Item Rev)") ), Overlay( :NewItemName ) ),
+	Elements( Bar( X, Y, Legend( 10 ), Bar Style( "Stacked" ), Label( "Label by Value" )  ) ),
+	SendToReport(
+		Dispatch( {}, "400", LegendBox, {Set Title( "" ), Set Wrap( 0 )} )
+	)
+);
+
+
+by_cat_ww<< Graph Builder(
+	Size( 1200, 900 ),
+	Show Control Panel( 0 ),
+	Variables( X( :ww ), Y( name ("sum(Item Rev)") ), Overlay( :category ) ),
+	Elements( Bar( X, Y, Legend( 10 ), Bar Style( "Stacked" ), Label( "Label by Value" )  ) ),
+	SendToReport(
+		Dispatch( {}, "400", LegendBox, {Set Title( "" ), Set Wrap( 0 )} )
+	)
+);
+
+by_res_ww<< Graph Builder(
+	Size( 1200, 900 ),
+	Show Control Panel( 0 ),
+	Variables( X( :ww ), Y( name ("sum(Item Rev)") ), Overlay( :responsibility ) ),
+	Elements( Bar( X, Y, Legend( 10 ), Bar Style( "Stacked" ), Label( "Label by Value" )  ) ),
+	SendToReport(
+		Dispatch( {}, "400", LegendBox, {Set Title( "" ), Set Wrap( 0 )} )
+	)
+);
+
+
+
+   dt_sum<<Graph Builder(
+	Size( 800, 600 ),
+	Show Control Panel( 0 ),
+	Variables( X( :Day ), Y( :Total Rev ), Overlay( :WW ) ),
+	Elements( Points( X, Y, Legend( 5 ) ), Smoother( X, Y, Legend( 7 ) ) )
+);
+
+dt_sum<<Graph Builder(
+	Size( 1200, 600 ),
+		Show Control Panel( 0 ),
+
+	Variables( X( :Date ), Y( :Total Rev ), Overlay( :WW ) ),
+	Elements( Points( X, Y, Legend( 5 ) ), Smoother( X, Y, Legend( 7 ) ) )
+);
+
+
+dt<<Graph Builder(
+	Size( 800, 900 ),
+	show Control Panel( 0 ),
+
+	Variables( X( :TimeOfDay), Group Y (:Day)),
+	Elements( Histogram( X, Legend( 8 ) ) ),
+	SendToReport(
+		Dispatch(
+			{},
+			"TimeOfDay",
+			ScaleBox,
+			{Format( "Best", 12 ), Min( 10 ), Max( 21.5 ), Inc( 0.5 ),
+			Minor Ticks( 1 )}
+		)
+	)
+);
+
+/*
+dt_sum<<
+Contingency(
+	Y( :NewItemName ),
+	X( :Date ),
+	Contingency Table( 0 ),
+	SendToReport(
+		Dispatch(
+			{"Mosaic Plot"},
+			"Conting Mosaic",
+			FrameBox,
+			{Frame Size( 1000, 800 )}
+		),
+		Dispatch(
+			{"Mosaic Plot"},
+			"Conting Mosaic Single",
+			FrameBox,
+			{Frame Size( 10, 411 )}
+		)
+	)
+);
+*/
+		
+);
+
+	
+);
+
+Delete File("C:\Program Files\SAS\JMP\13\pptx\JMPExportTemplate.pptx");
+
+//close (item_rank, No Save);
+copy File("C:\Program Files\SAS\JMP\13\pptx\JMPExportTemplate_stix.pptx", "C:\Program Files\SAS\JMP\13\pptx\JMPExportTemplate.pptx");
+
+
+
+report_path = "C:\Users\lishuyi\Documents\personal\sushi_stix_report\";
+final_report << save Presentation (report_path||file_prefix||"_auto_Report.pptx");
+
+copy File("C:\Program Files\SAS\JMP\13\pptx\JMPExportTemplate_work.pptx", "C:\Program Files\SAS\JMP\13\pptx\JMPExportTemplate.pptx");
+
+//close (item_rank, No Save);
+
+close (dt_sum_total, No Save);
+close (item_rank, No Save);
+
+dt_sum << save(data_path||file_prefix||"_auto_data");
